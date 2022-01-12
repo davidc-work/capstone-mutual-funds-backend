@@ -34,13 +34,11 @@ AWS.config.update(awsConfig);
 
 let docClient = new AWS.DynamoDB.DocumentClient();
 
-var CUSTOMEPOCH = 1300000000000;
 function generateRowId(shardId = 4) {
-  var ts = new Date().getTime() - CUSTOMEPOCH;
+  var ts = 512 * (shardId + 64 * (new Date().getTime() - 1300000000000));
   var randid = Math.floor(Math.random() * 512);
-  ts = (ts * 64);
-  ts = ts + shardId;
-  return (ts * 512) + randid;
+
+  return ts + randid;
 }
 
 function getAll(table, callback) {
@@ -54,25 +52,28 @@ function getAll(table, callback) {
   });
 }
 
-app.get('/', (req, res) => {
-  res.send('');
-});
+let _funds = [], _users = [];
 
-app.get('/funds', (req, res) => {
+function update() {
   getAll('capstone_mutual_funds', (err, data) => {
-    if (err) res.send(err);
-    else res.send(data.Items);
+    if (err) console.error(err);
+    else _funds = data.Items;
   });
-});
 
-app.get('/funds/:id', (req, res) => {
-  const id = req.params.id;
-
-  getAll('capstone_mutual_funds', (err, data) => {
-    if (err) res.send(err);
-    else res.send(data.Items.find(i => i.id == id));
+  getAll('capstone_mutual_funds_users', (err, data) => {
+    if (err) console.error(err);
+    else _users = data.Items;
   });
-});
+}
+
+update();
+setInterval(update, 10000);
+
+app.get('/', (req, res) => res.send(''));
+
+app.get('/funds', (req, res) => res.send(_funds));
+
+app.get('/funds/:id', (req, res) => res.send(_funds.find(i => i.id == req.params.id)));
 
 app.get('/get-stocks/:id', (req, res) => {
   const options = {
@@ -88,102 +89,75 @@ app.get('/get-stocks/:id', (req, res) => {
   request.on('error', err => res.send(data));
 });
 
-app.get('/user-funds', (req, res) => {
-  getAll('capstone_mutual_funds_users', (err, data) => {
-    if (err) res.send(err);
-    else res.send(data.Items);
-  });
-});
+app.get('/user-funds', (req, res) => res.send(_users));
 
 app.get('/user-funds/:id', (req, res) => {
-  const id = req.params.id;
-
-  getAll('capstone_mutual_funds_users', (err, data) => {
-    if (err) res.send(err);
-    else {
-      var fund_ids = data.Items.filter(i => i.user_id == id || i.username == id)
-        .map(i => i.fund_id);
-      getAll('capstone_mutual_funds', (err, data) => {
-        if (err) res.send(err);
-        else {
-          res.send(fund_ids.map(n => {
-            const r = data.Items.find(i => i.id == n);
-            return r ? {
-              name: r.fund_name,
-              price: r.price,
-              stocks: []
-            } : undefined;
-          }));
-        }
-      });
-      
-    }
-  });
+  var fund_ids = _users.filter(u => u.user_id == req.params.id).map(u => u.fund_id);
+  res.send(fund_ids.map(id => {
+    const r = _funds.find(f => f.id == id);
+    return r ? {
+      name: r.fund_name,
+      price: r.price,
+      stocks: []
+    } : undefined;
+  }));
 });
 
 app.delete('/user-funds/:id', (req, res) => {
-  const id = req.params.id;
-
-  getAll('capstone_mutual_funds_users', (err, data) => {
-    if (err) res.send(err);
-    else {
-      var rows = data.Items.filter(i => i.user_id == id);
-      if (!rows.length) return res.send('id invalid');
-      var items = rows.map(r => ({
-        DeleteRequest: {
-          Key: {
-            id: r.id
-          }
-        }
-      }));
-
-      const params = {
-        RequestItems: {
-          'capstone_mutual_funds_users' : items
-        }
+  var rows = _users.filter(i => i.user_id == req.params.id);
+  if (!rows.length) return res.send('id invalid');
+  var items = rows.map(r => ({
+    DeleteRequest: {
+      Key: {
+        id: r.id
       }
-
-      docClient.batchWrite(params, (err, data) => {
-        if (err) res.send(err);
-        else res.send(data);
-      });
     }
+  }));
+
+  const params = {
+    RequestItems: {
+      'capstone_mutual_funds_users' : items
+    }
+  }
+
+  docClient.batchWrite(params, (err, data) => {
+    if (err) res.send(err);
+    else res.send(data);
+
+    update();
   });
 });
 
 app.delete('/user-funds/:user_id/:fund_id', (req, res) => {
   const { user_id, fund_id } = req.params;
 
-  getAll('capstone_mutual_funds_users', (err, data) => {
-    if (err) res.send(err);
-    else {
-      var rows = data.Items.filter(i => i.user_id == user_id && i.fund_id == fund_id);
-      if (!rows.length) return res.send('user and/or fund id invalid');
-      var items = rows.map(r => ({
-        DeleteRequest: {
-          Key: {
-            id: r.id
-          }
-        }
-      }));
-
-      const params = {
-        RequestItems: {
-          'capstone_mutual_funds_users' : items
-        }
+  var row = _users.find(u => u.user_id == user_id && u.fund_id == fund_id);
+  if (row) {
+    var params = {
+      TableName: 'capstone_mutual_funds_users',
+      Key: {
+        id: row.id
       }
-
-      docClient.batchWrite(params, (err, data) => {
-        if (err) res.send(err);
-        else res.send(data);
-      });
     }
-  });
+
+    docClient.delete(params, (err, data) => {
+      if (err) res.send(err);
+      else res.send(data);
+
+      update();
+    });
+  } else res.send('invalid user or fund id');
 });
 
 app.post('/user-funds', jsonParser, (req, res) => {
   console.log(req.body);
   const body = req.body;
+
+  if (_users.find(u => u.user_id == body.user_id && u.fund_id == body.fund_id)) 
+    return res.send({
+      err: 'User ' + body.user_id + ' already has fund ' + body.fund_id
+    });
+
   const input = {
     id: generateRowId(),
     user_id: body.user_id,
@@ -198,6 +172,8 @@ app.post('/user-funds', jsonParser, (req, res) => {
   docClient.put(params, (err, data) => {
     if (err) console.error(err);
     else res.send('success');
+
+    update();
   });
 });
 
