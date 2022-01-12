@@ -52,7 +52,21 @@ function getAll(table, callback) {
   });
 }
 
-let _funds = [], _users = [];
+let _funds = [], _users = [], _stocks = [];
+
+function getStocks(callback) {
+  const options = {
+    hostname: 'stockapiaddresshere.com',
+    path: '/',
+    method: 'GET'
+  }
+
+  const request = https.request(options, response => {
+    response.on('data', data => callback(data));
+  });
+
+  request.on('error', err => callback(err));
+}
 
 function update() {
   getAll('capstone_mutual_funds', (err, data) => {
@@ -64,6 +78,8 @@ function update() {
     if (err) console.error(err);
     else _users = data.Items;
   });
+
+  getStocks(data => _stocks = data);
 }
 
 update();
@@ -74,20 +90,6 @@ app.get('/', (req, res) => res.send(''));
 app.get('/funds', (req, res) => res.send(_funds));
 
 app.get('/funds/:id', (req, res) => res.send(_funds.find(i => i.id == req.params.id)));
-
-app.get('/get-stocks/:id', (req, res) => {
-  const options = {
-    hostname: 'stockapiaddresshere.com',
-    path: '/mutual-funds/' + req.params.id,
-    method: 'GET'
-  }
-
-  const request = https.request(options, response => {
-    response.on('data', data => res.send(data));
-  });
-
-  request.on('error', err => res.send(data));
-});
 
 app.get('/user-funds', (req, res) => res.send(_users));
 
