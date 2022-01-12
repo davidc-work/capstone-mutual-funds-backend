@@ -106,7 +106,14 @@ app.get('/user-funds/:id', (req, res) => {
       getAll('capstone_mutual_funds', (err, data) => {
         if (err) res.send(err);
         else {
-          res.send(fund_ids.map(n => (data.Items[n] || { fund_name: 'invalid_fund' }).fund_name));
+          res.send(fund_ids.map(n => {
+            const r = data.Items.find(i => i.id == n);
+            return r ? {
+              name: r.fund_name,
+              price: r.price,
+              stocks: []
+            } : undefined;
+          }));
         }
       });
       
@@ -179,7 +186,6 @@ app.post('/user-funds', jsonParser, (req, res) => {
   const body = req.body;
   const input = {
     id: generateRowId(),
-    username: body.name,
     user_id: body.user_id,
     fund_id: body.fund_id
   }
