@@ -96,11 +96,15 @@ app.get('/user-funds/:id', (req, res) => {
   res.send(fund_ids.map(id => {
     const r = _funds.find(f => f.id == id);
     return r ? {
+      fund_id: id,
       name: r.fund_name,
       price: r.price,
       stocks: []
-    } : undefined;
-  }));
+    } : {
+      fund_id: id,
+      err: 'does not exist'
+    };
+  }).sort((a, b) => a.fund_id - b.fund_id));
 });
 
 app.delete('/user-funds/:id', (req, res) => {
