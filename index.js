@@ -3,10 +3,15 @@ import AWS from 'aws-sdk';
 import express from 'express';
 import bodyParser from 'body-parser';
 import https from 'https';
+import cors from 'cors';
 
 const app = express();
+app.use(cors({
+  origin: '*'
+}));
+
 var jsonParser = bodyParser.json();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5280;
 
 function encrypt(text) {
     var cipher = crypto.createCipher('aes256', 'password');
