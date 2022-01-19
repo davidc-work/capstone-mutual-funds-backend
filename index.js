@@ -149,6 +149,27 @@ app.get('/funds', (req, res) => res.send(_funds));
 
 app.get('/funds/:id', (req, res) => res.send(_funds.find(i => i.id == req.params.id)));
 
+app.delete('/funds/:id', (req, res) => {
+  const { id } = req.params;
+
+  var row = _funds.find(u => u.id == id);
+  if (row) {
+    var params = {
+      TableName: 'capstone_mutual_funds',
+      Key: {
+        id: row.id
+      }
+    }
+
+    docClient.delete(params, (err, data) => {
+      if (err) res.send(err);
+      else res.send(data);
+
+      update();
+    });
+  } else res.send('invalid fund id');
+});
+
 app.get('/user-funds', (req, res) => res.send(_users));
 
 app.get('/user-funds/:id', (req, res) => {
