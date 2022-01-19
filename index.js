@@ -4,6 +4,7 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import https from 'https';
 import cors from 'cors';
+import funds from './funds.js';
 
 const app = express();
 app.use(cors({
@@ -91,6 +92,90 @@ update();
 setInterval(update, 10000);
 
 app.get('/', (req, res) => res.send(''));
+
+app.get('/reset-funds', (req, res) => {
+  //delete all
+
+  var items = _funds.map(r => ({
+    DeleteRequest: {
+      Key: {
+        id: r.id
+      }
+    }
+  }));
+
+  bulkWrite('capstone_mutual_funds', items, () => {
+    var ids = [];
+    while (ids.length < funds.length) {
+      let a;
+      while(ids.includes(a = generateRowId())) ;
+      ids.push(a);
+    }
+
+    items = funds.map((f, i) => {
+      var obj = Object.assign({}, f, {id: ids[i]});
+      //console.log(obj.id);
+      return {
+        PutRequest: {
+          Item: obj
+        }
+      }
+    });
+
+    bulkWrite('capstone_mutual_funds', items, () => {
+      update();
+      res.send('Funds table reset!');
+    });
+  });
+
+  /*var params = {
+    RequestItems: {
+      'capstone_mutual_funds' : items
+    }
+  }
+
+  docClient.batchWrite(params, (err, data) => {
+    if (err) return res.send(err);
+    var ids = [];
+    while (ids.length < funds.length) {
+      let a;
+      while(ids.includes(a = generateRowId())) ;
+      ids.push(a);
+    }
+
+    items = funds.map((f, i) => {
+      var obj = Object.assign({}, f, {id: ids[i]});
+      //console.log(obj.id);
+      return {
+        PutRequest: {
+          Item: obj
+        }
+      }
+    });
+
+    bulkWrite('capstone_mutual_funds', items, () => {
+      update();
+      res.send('Funds table reset!');
+    });
+  });*/
+});
+
+function bulkWrite(table, items, callback) {
+  var i = {};
+  i[table] = items.splice(0, 25);
+
+  const params = {
+    RequestItems: i
+  }
+
+  docClient.batchWrite(params, (err, data) => {
+    if (err) console.error(err);
+    else {
+      if (items.length) bulkWrite(table, items, callback);
+      else callback();
+    }
+  });
+}
 
 app.get('/funds', (req, res) => res.send(_funds));
 
