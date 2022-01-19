@@ -112,9 +112,9 @@ app.get('/reset-funds', (req, res) => {
       ids.push(a);
     }
 
-    items = funds.map((f, i) => {
-      var obj = Object.assign({}, f, {id: ids[i]});
-      //console.log(obj.id);
+    items = funds.sort((a, b) => a.name.localeCompare(b.name)).map((f, i) => {
+      var obj = Object.assign({}, f, {id: i + 1});
+      
       return {
         PutRequest: {
           Item: obj
@@ -127,40 +127,11 @@ app.get('/reset-funds', (req, res) => {
       res.send('Funds table reset!');
     });
   });
-
-  /*var params = {
-    RequestItems: {
-      'capstone_mutual_funds' : items
-    }
-  }
-
-  docClient.batchWrite(params, (err, data) => {
-    if (err) return res.send(err);
-    var ids = [];
-    while (ids.length < funds.length) {
-      let a;
-      while(ids.includes(a = generateRowId())) ;
-      ids.push(a);
-    }
-
-    items = funds.map((f, i) => {
-      var obj = Object.assign({}, f, {id: ids[i]});
-      //console.log(obj.id);
-      return {
-        PutRequest: {
-          Item: obj
-        }
-      }
-    });
-
-    bulkWrite('capstone_mutual_funds', items, () => {
-      update();
-      res.send('Funds table reset!');
-    });
-  });*/
 });
 
 function bulkWrite(table, items, callback) {
+  if (!items.length) callback();
+
   var i = {};
   i[table] = items.splice(0, 25);
 
@@ -170,10 +141,7 @@ function bulkWrite(table, items, callback) {
 
   docClient.batchWrite(params, (err, data) => {
     if (err) console.error(err);
-    else {
-      if (items.length) bulkWrite(table, items, callback);
-      else callback();
-    }
+    else bulkWrite(table, items, callback);
   });
 }
 
