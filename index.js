@@ -5,6 +5,8 @@ import bodyParser from 'body-parser';
 import https from 'https';
 import cors from 'cors';
 import funds from './funds.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
 app.use(cors({
@@ -14,27 +16,11 @@ app.use(cors({
 var jsonParser = bodyParser.json();
 const port = process.env.PORT || 5280;
 
-function encrypt(text) {
-    var cipher = crypto.createCipher('aes256', 'password');
-    return cipher.update(text, 'utf8', 'hex') + cipher.final('hex');
-}
-
-function decrypt(text) {
-    var decipher = crypto.createDecipher('aes256', 'password');
-    return decipher.update(text, 'hex', 'utf8') + decipher.final('utf8');
-}
-
-var aivonpeaamk = '2bc1429da10de25ab39ef4cd4887c1b996c903577fe69a0f88c54525306fa11a';
-var ixiujewkssfdewu = 'daa135a85bbcf3df8db2446142bb53a0b0f1872aae1a3af98323cb66a05596deb4c57c87ed7ad1bd68002cb0b699a5a1';
-
-var lkzojewmkl = decrypt(aivonpeaamk);
-var iocjowmklew = decrypt(ixiujewkssfdewu);
-
 let awsConfig = {
     region: 'us-east-1',
     endpoint: 'http://dynamodb.us-east-1.amazonaws.com',
-    accessKeyId: lkzojewmkl,
-    secretAccessKey: iocjowmklew
+    accessKeyId: process.env.accessKeyId,
+    secretAccessKey: process.env.secretAccessKey
 }
 AWS.config.update(awsConfig);
 
@@ -130,7 +116,7 @@ app.get('/reset-funds', (req, res) => {
 });
 
 function bulkWrite(table, items, callback) {
-  if (!items.length) callback();
+  if (!items.length) return callback();
 
   var i = {};
   i[table] = items.splice(0, 25);
